@@ -1,0 +1,21 @@
+@font-face {
+  font-family: 'test';
+  src: url('../public/fonts/glyphicons-halflings-regular.ttf');
+}
+.home {
+  color: $primary;
+  background-image: url('@/assets/img/arrow_left.png');
+  font-family: test;
+}
+
+
+.big {
+  color: red;
+  background-image: url('../assets/img/cat.jpg');
+  display: flex;
+  justify-content: center;
+}
+
+.small {
+  background-image: url('../assets/img/arrow_left.png');
+}
