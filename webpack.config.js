@@ -27,6 +27,71 @@ const { VueLoaderPlugin } = require('vue-loader');
 // 例如: 圖片小於預設大小轉為 base64，大於用引入檔案的方式
 // 可選擇走 asset/resource 或 asset/inline
 
+
+
+// code-splitting
+// 目的:
+// (1)移除重複的 modules:使用 SplitChunks 將npm module
+// (例如:react、vue等)或者自定義的組件獨立打包出來。
+// (2)Dynamic Imports:透過import()來達到code split。
+// (3)拆分成小的 bundle，真的需要用到的 bundle 的頁面才引入，不斷堆疊
+// 注意事項:
+// (1)依頁面分成本身頁面的 js(dynamic import) 和組件的 js 和 npm 和 css(style import)
+// (2)換頁時自動加載
+
+
+// Module
+// // npm或是自定義的組件,js
+
+// Chunk
+// // 辨認 module 該如何 code-splitting 的過程
+// // 例如:一樣的模組就會只打包一次
+// // 直接對應所輸出的 bundle，可以是一對多
+
+// Bundle
+// 把 module 打包或是編譯成最後給瀏覽器閱讀的檔案
+// 運作方式:
+// (1)分析所有檔案以及套件的相依性把自己的 JS 檔案跟 npm 或 自定義的 js 或組件打包在同一支
+// (2)開發用 import 跟 export，輸出時被 babel 或者是 webpack 轉成 CommonJS 或是其他形式了
+// (3)外面還有再包一層來負責解析 require 這一些語法
+// (4)檔案愈來愈大的時候，花的時間也就自然愈來愈多，因為 webpack 要搞清楚到底要怎麼打包
+
+
+// 動態(lazy-loading)的定義
+// //一定會額外打包成 bundle 不管 cacheGroup 的設定
+// 使用方式: import()的 lazy loading 本來就可以強制提取出 bundle，需要時再引入
+// //有 weback 專用屬性
+// webpackChunkName
+// //如果把註解移除，預設的 chunkName 為數字
+// webpackPreload
+// //確實 link 有加上 preload
+// //下次 import 不再次下載也能拿到data
+// webpackPrefetch
+
+// 靜態的定義
+// //不一定會分 bundle 不管 cacheGroup 的設定
+// 使用方式: import '' from ''的 static 會包在頁面 bundle
+// //沒有weback專用屬性
+
+
+// *npm
+// 動態
+// 有名字有分開
+// 靜態
+// 沒名字有分開
+// (1)被提出來的 npm 包為甚麼不是在vendor.js
+// //因為不一定當下頁面就要引入該套件
+// //vendor.js一定是全部頁面有要用到的
+// (2)被提出來的npm包為甚麼檔名是亂數
+// //因為optimization裡的chunks是initial包裝到靜態的js項目沒有webpackChunkName的屬性
+
+// *自定義的頁面,js,css,框架組件
+// 動態
+// 有名字有分開
+// 靜態
+// 沒名字沒分開
+// #決定哪種模式看這支 js 在這頁是否一定會用到
+
 module.exports = {
   // 從 package.json 抓到 NODE_ENV 的自定義值
   mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
@@ -38,8 +103,7 @@ module.exports = {
   // entry 的 key 代表 HtmlWebpackPlugin chunk 的 js
   entry: {
     main: './js/main.js',
-    /* index: './js/index.js',
-    about: './js/about.js' */
+    //about: './js/about.js'
   },
   output: {
     // 產出路徑
@@ -66,10 +130,20 @@ module.exports = {
     port: 8000,
     // 自動開啟視窗
     open: false,
+    // 建立在內網，直接用手機連線
+    //host: '192.168.98.59'
+    /* proxy: {
+      '/api': {
+        target: 'http://api-tca.b2bdev.com',
+        secure: false,
+        changeOrigin: true
+      }
+    } */
   },
   resolve: {
     // 用在 import 時不用相對路徑
-    // 自動查找以下路徑
+
+    // 自動查找以下路徑中符合的檔案
     /* modules: [
       path.resolve('src'),
       path.resolve('src/js'),
@@ -77,7 +151,7 @@ module.exports = {
       path.resolve('src/images'),
       path.resolve('node_modules'),
     ], */
-    // 自動查找副檔名符合的檔案
+    // 自動查找路徑中副檔名符合的檔案
     //extensions: ['.vue', '.mjs', '.js', '.json'],
     alias: {
       // 自定義檔案前綴
@@ -88,22 +162,40 @@ module.exports = {
   optimization: {
     splitChunks: {
       cacheGroups: {
+        // 抽離 node_modules
         vendor: {
-          // 每次打包會判斷是否和原本的一樣，決定是否再次打包
-          // 預設每一支 js 檔都會把 node_modules 包在一起
-          // 把 node_modules 打包成 vendor.js
-          // 減少每次都要重新打包 node_modules
-          // 盡量只重打包 entry 的 js
+          // 預設每一支 bundle 都會把 node_modules 打包在一起
+          // 目的:
+          // 不要把每一支 bundle 和 node_modules 打包在一起，這樣每一頁的 js 檔會重複打包套件的 js，太肥
+          // 做法:
+          // 把 node_modules 打包成 vendor.js，
+          // 結果:
+          // 例如: vue 的核心代碼包成一支 vendor.js
           test: /[\\/]node_modules[\\/]/,
           name: 'vendor',
-          // async：只處理 Lazy Loading 的 chunks，例如 import(xxx) 語法載入的模組
-          // initial：只處理同步加載的 chunk，例如 import xxx 語法載入的模組
+          // async：(預設)只處理 Lazy Loading(動態) 的 chunks，例如 import(xxx) 語法載入的模組
+          // initial：只處理同步(靜態)加載的 chunk，例如 import 'xxx' or import x from 'xxx' 語法載入的模組
           // all：兼容以上兩種方式，通通進行處理
           chunks: 'initial',
+          priority: 20,
+          // 優先依照哪個規則走
           enforce: true// 不參考全域的屬性
+        },
+        // 抽離公用模組
+        common: {
+          // 把共用的 js 檔抽離成一支，而不是每個地方都寫一次
+          chunks: 'initial',
+          minSize: 0,
+          name: 'common',
+          minChunks: 2,
+          // 被引用的次數符合就另外包成 bundle,不符合則和頁面 bundle 包一起，默認為1
+          priority: 10,
+          // 優先依照哪個規則走
         },
       },
     },
+    // 管理所有模塊之間如何引用
+    runtimeChunk: { name: 'manifest' },
   },
   module: {
     // 解析不同檔案的 loader
@@ -155,46 +247,46 @@ module.exports = {
             maxSize: 4 * 1024 // 1kb
           },
         },
-        use: [
-          /* {
-            loader: 'url-loader',
-            options: {
-              limit: 8192,
-              name: '[path][name].[ext]?[hash:8]',
-              fallback: require.resolve('file-loader'),
-            },
-          }, */
-          {
-            // 圖片壓縮，沒有出現在文檔，有另一個 image-minimizer-webpack-plugin
-            // 先執行壓縮
-            loader: 'image-webpack-loader',
-            options: {
-              //disable: process.env.NODE_ENV === 'production' ? false : true,
-              mozjpeg: {
-                // jpg
-                progressive: true,
-                quality: 65,
-              },
-              optipng: {
-                // png
-                enabled: false, // 表示不啟用這一個圖片優化器
-              },
-              pngquant: {
-                // png
-                quality: [0.65, 0.9],
-                speed: 4,
-              },
-              gifsicle: {
-                // gig
-                interlaced: false,
-              },
-              webp: {
-                // webp
-                quality: 75, // 配置選項表示啟用 WebP 優化器
-              },
-            },
-          },
-        ],
+        // use: [
+        //   /* {
+        //     loader: 'url-loader',
+        //     options: {
+        //       limit: 8192,
+        //       name: '[path][name].[ext]?[hash:8]',
+        //       fallback: require.resolve('file-loader'),
+        //     },
+        //   }, */
+        //   {
+        //     // 圖片壓縮，沒有出現在文檔，有另一個 image-minimizer-webpack-plugin
+        //     // 先執行壓縮
+        //     loader: 'image-webpack-loader',
+        //     options: {
+        //       //disable: process.env.NODE_ENV === 'production' ? false : true,
+        //       mozjpeg: {
+        //         // jpg
+        //         progressive: true,
+        //         quality: 65,
+        //       },
+        //       optipng: {
+        //         // png
+        //         enabled: false, // 表示不啟用這一個圖片優化器
+        //       },
+        //       pngquant: {
+        //         // png
+        //         quality: [0.65, 0.9],
+        //         speed: 4,
+        //       },
+        //       gifsicle: {
+        //         // gig
+        //         interlaced: false,
+        //       },
+        //       webp: {
+        //         // webp
+        //         quality: 75, // 配置選項表示啟用 WebP 優化器
+        //       },
+        //     },
+        //   },
+        // ],
       },
     ],
   },

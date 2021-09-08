@@ -3,6 +3,7 @@
     <router-link to="/" class="home">{{ value }}</router-link>
     <router-link to="/about">about</router-link>
     <router-link to="/news">news</router-link>
+    <router-link to="/list">list</router-link>
   </div>
 </template>
 
@@ -36,6 +37,6 @@ export default {
 }
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 @import '@/scss/pages/home.scss';
 </style>
