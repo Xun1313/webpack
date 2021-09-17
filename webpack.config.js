@@ -5,6 +5,7 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin");//取代 style l
 const CopyPlugin = require("copy-webpack-plugin");
 const webpack = require('webpack')
 const { VueLoaderPlugin } = require('vue-loader');
+//const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 //console.log(VueLoaderPlugin);
 
 // webpack 預設只看得懂 js
@@ -293,6 +294,7 @@ module.exports = {
   // 顯示未編譯的 debug 模式
   //devtool: 'source-map',
   plugins: [
+    //new BundleAnalyzerPlugin(),
     new VueLoaderPlugin(),
     new HtmlWebpackPlugin({
       // HtmlWebpackPlugin 可用編譯的方式產出 html，chunk 能引入對應的 js 路徑，不需要自己引入，預設不產出
